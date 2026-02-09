@@ -24,7 +24,7 @@ pub struct Shader<'a> {
 
 impl<'a> Shader<'a> {
     /// Create a new shader instance with the provided [`ShaderInput`](crate::ShaderInput).
-    pub fn new(_compiler: &'a Compiler, input: ShaderInput) -> Result<Self, GlslangError> {
+    pub fn new(_compiler: &'a Compiler, input: ShaderInput, entry_point: Option<&str>) -> Result<Self, GlslangError> {
         let shader = Self {
             handle: unsafe {
                 NonNull::new(sys::glslang_shader_create(&input.input))
@@ -50,6 +50,13 @@ impl<'a> Shader<'a> {
         unsafe {
             if sys::glslang_shader_preprocess(shader.handle.as_ptr(), &input.input) == 0 {
                 return Err(ParseError(shader.get_log()));
+            }
+        }
+
+        if let Some(entry_point) = entry_point {
+            let entry_point = CString::new(entry_point).unwrap();
+            unsafe {
+                sys::glslang_shader_set_entry_point(shader.handle.as_ptr(), entry_point.as_ptr());
             }
         }
 

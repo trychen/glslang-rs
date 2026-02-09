@@ -40,7 +40,7 @@ impl Compiler {
 
     /// Create a [`Shader`](crate::Shader) with the given inputs.
     pub fn create_shader(&'_ self, input: ShaderInput) -> Result<Shader<'_>, error::GlslangError> {
-        Shader::new(self, input)
+        Shader::new(self, input, None)
     }
 
     /// Create a [`Program`](crate::Program) instance.
