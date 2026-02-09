@@ -2,7 +2,7 @@ use crate::ctypes::ShaderStage;
 use crate::error::GlslangError;
 use crate::{Compiler, Shader};
 use glslang_sys as sys;
-use glslang_sys::glslang_spv_options_s;
+use glslang_sys::{glslang_messages_t, glslang_spv_options_s, glslang_spv_options_t};
 use rustc_hash::FxHashMap;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
@@ -102,6 +102,45 @@ impl<'a> Program<'a> {
         }
 
         Ok(buffer)
+    }
+
+    /// Compile the given stage to SPIR-V, consuming the program.
+    ///
+    /// A [`Program`](crate::Program) can not be re-used to compile multiple stages.
+    pub fn custom_compile(self, stages: &[ShaderStage], messages: glslang_messages_t, options: glslang_spv_options_t) -> Result<Vec<Vec<u32>>, GlslangError> {
+        if unsafe {
+            sys::glslang_program_link(self.handle.as_ptr(), messages.0 as core::ffi::c_int)
+        } == 0
+        {
+            return Err(GlslangError::LinkError(self.get_log()));
+        }
+
+        let mut options = options;
+
+        let mut result = vec![];
+        for &stage in stages {
+            // If the stage was not previously added to the program, compiling SPIRV ends up segfaulting.
+            if !self.cache.contains_key(&stage) {
+                return Err(GlslangError::ShaderStageNotFound(stage));
+            }
+
+            // We don't support SPIRV compile options because nearly all of them (except for generateDebugInfo),
+            // require callbacks that either we don't expose, or are not exposed by the C API.
+            // disableOptimizer is redundant as well because we need to support WASM, which doesn't support
+            // the optimizer.
+            unsafe { sys::glslang_program_SPIRV_generate_with_options(self.handle.as_ptr(), stage, &mut options) }
+
+            let size = unsafe { sys::glslang_program_SPIRV_get_size(self.handle.as_ptr()) };
+            let mut buffer = vec![0u32; size];
+
+            unsafe {
+                sys::glslang_program_SPIRV_get(self.handle.as_ptr(), buffer.as_mut_ptr());
+            }
+
+            result.push(buffer);
+        }
+
+        Ok(result)
     }
 
     /// Compile the given stage to SPIR-V, optimizing for size, consuming the program.
