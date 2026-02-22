@@ -79,7 +79,7 @@ impl<'a> Shader<'a> {
     /// This doesn't actually seem to do anything and has the potential for unsoundness.
     #[doc(hidden)]
     #[allow(unused)]
-    fn shift_binding(&mut self, resource_type: ResourceType, base: u32) {
+    pub fn shift_binding(&mut self, resource_type: ResourceType, base: u32) {
         unsafe {
             sys::glslang_shader_shift_binding(self.handle.as_ptr(), resource_type, base);
         }
@@ -89,7 +89,7 @@ impl<'a> Shader<'a> {
     /// This doesn't actually seem to do anything and has the potential for unsoundness.
     #[doc(hidden)]
     #[allow(unused)]
-    fn shift_binding_for_set(&mut self, resource_type: ResourceType, base: u32, set: u32) {
+    pub fn shift_binding_for_set(&mut self, resource_type: ResourceType, base: u32, set: u32) {
         unsafe {
             sys::glslang_shader_shift_binding_for_set(
                 self.handle.as_ptr(),
@@ -97,6 +97,13 @@ impl<'a> Shader<'a> {
                 base,
                 set,
             );
+        }
+    }
+
+    #[allow(unused)]
+    pub fn set_default_uniform_block_set_and_binding(&mut self, set: u32, binding: u32) {
+        unsafe {
+            sys::glslang_shader_set_default_uniform_block_set_and_binding(self.handle.as_ptr(), set, binding);
         }
     }
 
@@ -183,7 +190,7 @@ void main() {
             None,
         )
         .expect("target");
-        let shader = Shader::new(compiler, input).expect("shader init");
+        let shader = Shader::new(compiler, input, None).expect("shader init");
 
         let code = shader.get_preprocessed_code();
 
@@ -549,16 +556,13 @@ impl<'a> From<&'a (&'a str, Option<&'a str>)> for MacroDefine<'a> {
 /// The input to a shader instance.
 impl<'a> ShaderInput<'a> {
     /// Create a new [`ShaderInput`](crate::ShaderInput) with default limits.
-    pub fn new<'def, D: 'def>(
+    pub fn new<'def>(
         source: &'a ShaderSource,
         stage: ShaderStage,
         options: &CompilerOptions,
-        defines: Option<&'def [D]>,
+        defines: Option<Vec<MacroDefine<'def>>>,
         include_handler: Option<&'a mut dyn IncludeHandler>,
-    ) -> Result<Self, GlslangError>
-    where
-        MacroDefine<'def>: From<&'def D>,
-    {
+    ) -> Result<Self, GlslangError> {
         Self::new_with_limits(
             source,
             &limits::DEFAULT_LIMITS,
@@ -570,16 +574,14 @@ impl<'a> ShaderInput<'a> {
     }
 
     /// Create a new [`ShaderInput`](crate::ShaderInput) with the specified resource limits.
-    pub fn new_with_limits<'def, D: 'def>(
+    pub fn new_with_limits<'def>(
         source: &'a ShaderSource,
         resource: &'a ResourceLimits,
         stage: ShaderStage,
         options: &CompilerOptions,
-        defines: Option<&'def [D]>,
+        defines: Option<Vec<MacroDefine<'def>>>,
         include_handler: Option<&'a mut dyn IncludeHandler>,
     ) -> Result<Self, GlslangError>
-    where
-        MacroDefine<'def>: From<&'def D>,
     {
         let profile = options
             .version_profile
@@ -598,9 +600,8 @@ impl<'a> ShaderInput<'a> {
             _resource: &resource.0,
             defines: defines.map_or(FxHashMap::default(), |defines| {
                 defines
-                    .iter()
+                    .into_iter()
                     .map(|v| {
-                        let v: MacroDefine = MacroDefine::from(v);
                         (SmartString::from(v.name), v.value.map(SmartString::from))
                     })
                     .collect()

@@ -103,13 +103,20 @@ impl<'a> Program<'a> {
 
         Ok(buffer)
     }
-
+    
     /// Compile the given stage to SPIR-V, consuming the program.
     ///
     /// A [`Program`](crate::Program) can not be re-used to compile multiple stages.
     pub fn custom_compile(self, stages: &[ShaderStage], messages: glslang_messages_t, options: glslang_spv_options_t) -> Result<Vec<Vec<u32>>, GlslangError> {
         if unsafe {
             sys::glslang_program_link(self.handle.as_ptr(), messages.0 as core::ffi::c_int)
+        } == 0
+        {
+            return Err(GlslangError::LinkError(self.get_log()));
+        }
+
+        if unsafe {
+            sys::glslang_program_map_io(self.handle.as_ptr())
         } == 0
         {
             return Err(GlslangError::LinkError(self.get_log()));
