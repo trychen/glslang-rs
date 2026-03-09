@@ -512,9 +512,9 @@ impl Default for CompilerOptions {
 /// A `#define` macro to expand in the source code.
 pub struct MacroDefine<'a> {
     /// The name of the macro.
-    name: Cow<'a, str>,
+    pub name: Cow<'a, str>,
     /// The replacement value of the macro, if any.
-    value: Option<Cow<'a, str>>,
+    pub value: Option<Cow<'a, str>>,
 }
 
 impl MacroDefine<'_> {
